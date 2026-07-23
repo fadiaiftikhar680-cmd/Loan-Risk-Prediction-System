@@ -14,8 +14,11 @@ app = FastAPI(
     version="1.0"
 )
 
-# Load Model and Preprocessing Artifacts safely ( pointing to parent root folder )
-MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', 'model_artifacts')
+# Load Model and Preprocessing Artifacts safely ( adjusted for railway root directory setup )
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(BASE_DIR, '..', 'model_artifacts')
+if not os.path.exists(MODEL_DIR):
+    MODEL_DIR = os.path.join(BASE_DIR, 'model_artifacts')
 
 try:
     model = tf.keras.models.load_model(os.path.join(MODEL_DIR, 'loan_risk_ann_model.keras'))
