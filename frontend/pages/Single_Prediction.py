@@ -39,7 +39,7 @@ if submit_button:
     }
     
     try:
-        response = requests.post("http://127.0.0.1:8000/predict/single", json=payload)
+        response = requests.post("https://loan-risk-prediction-system-production.up.railway.app/predict/single", json=payload)
         
         if response.status_code == 200:
             result = response.json()

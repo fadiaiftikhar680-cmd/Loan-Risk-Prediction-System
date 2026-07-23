@@ -20,7 +20,7 @@ if uploaded_file is not None:
             files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "text/csv")}
             
             try:
-                response = requests.post("http://127.0.0.1:8000/predict/batch", files=files)
+                response = requests.post("https://loan-risk-prediction-system-production.up.railway.app/predict/batch", files=files)
                 
                 if response.status_code == 200:
                     res_data = response.json()
