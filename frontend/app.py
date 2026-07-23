@@ -1,19 +1,20 @@
 import streamlit as st
 import requests
 import pandas as pd
+import plotly.express as px
 
 st.set_page_config(page_title="Loan Risk Prediction System", page_icon="💳", layout="wide")
 
 st.title("💳 Intelligent Loan Risk Prediction System")
-st.write("Select the prediction mode from the sidebar below.")
+st.write("Professional Credit Risk Assessment Dashboard powered by Artificial Neural Networks.")
 
-# Sidebar navigation for Single or Batch
-app_mode = st.sidebar.selectbox("Choose Prediction Mode", ["Single Prediction", "Batch Prediction"])
+# Professional Sidebar Navigation
+app_mode = st.sidebar.radio("Navigation Menu", ["Single Prediction", "Batch Prediction"])
 
-# ----------------- SINGLE PREDICTION -----------------
+# ----------------- SINGLE PREDICTION PAGE -----------------
 if app_mode == "Single Prediction":
     st.header("👤 Single Loan Applicant Risk Assessment")
-    st.write("Enter the applicant's details below to check their credit risk status.")
+    st.write("Enter individual applicant details below to analyze risk profile and probability distribution.")
 
     with st.form("single_prediction_form"):
         col1, col2 = st.columns(2)
@@ -32,7 +33,7 @@ if app_mode == "Single Prediction":
             
         profession = st.text_input("Profession", value="Software_Developer")
         
-        submit_button = st.form_submit_button(label="Predict Risk")
+        submit_button = st.form_submit_button(label="Analyze Applicant Risk")
 
     if submit_button:
         payload = {
@@ -53,28 +54,50 @@ if app_mode == "Single Prediction":
             if response.status_code == 200:
                 result = response.json()
                 st.markdown("---")
-                st.subheader("Prediction Results")
+                st.subheader("Assessment Results")
                 
                 risk_flag = result["risk_flag"]
-                if risk_flag == "High Risk":
-                    st.error(f"**Risk Status:** {risk_flag}")
-                else:
-                    st.success(f"**Risk Status:** {risk_flag}")
-                    
-                st.metric(label="Risk Probability", value=f"{result['risk_percentage']}%")
-                st.write(f"**Recommendation:** {result['recommendation']}")
+                prob_pct = result["risk_percentage"]
+                
+                res_col1, res_col2 = st.columns(2)
+                with res_col1:
+                    if risk_flag == "High Risk":
+                        st.error(f"**Risk Status:** {risk_flag}")
+                    else:
+                        st.success(f"**Risk Status:** {risk_flag}")
+                    st.metric(label="Default Probability", value=f"{prob_pct}%")
+                    st.write(f"**Recommendation:** {result['recommendation']}")
+                
+                with res_col2:
+                    # Professional Gauge / Bar Chart for Single Prediction
+                    chart_data = pd.DataFrame({
+                        "Metric": ["Risk Probability", "Safety Margin"],
+                        "Percentage": [prob_pct, 100 - prob_pct]
+                    })
+                    fig = px.bar(
+                        chart_data, 
+                        x="Percentage", 
+                        y="Metric", 
+                        orientation="h", 
+                        title="Risk vs Safety Breakdown",
+                        text="Percentage",
+                        color="Metric",
+                        color_discrete_map={"Risk Probability": "#ff4b4b", "Safety Margin": "#00CC96"}
+                    )
+                    fig.update_layout(xaxis_range=[0, 100], showlegend=False)
+                    st.plotly_chart(fig, use_container_width=True)
             else:
                 st.error(f"Error from server: {response.json().get('detail', 'Unknown error')}")
                 
         except requests.exceptions.ConnectionError:
             st.error("Could not connect to the FastAPI backend.")
 
-# ----------------- BATCH PREDICTION -----------------
+# ----------------- BATCH PREDICTION PAGE -----------------
 elif app_mode == "Batch Prediction":
-    st.header("📂 Batch Loan Risk Prediction")
-    st.write("Upload a CSV file containing multiple applicant profiles to get bulk risk evaluations.")
+    st.header("📂 Batch Loan Risk Prediction & Analytics")
+    st.write("Upload a CSV file containing multiple applicant records for bulk evaluation and visual analytics.")
 
-    uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
+    uploaded_file = st.file_uploader("Upload Batch CSV File", type=["csv"])
 
     if uploaded_file is not None:
         df_preview = pd.read_csv(uploaded_file)
@@ -82,7 +105,7 @@ elif app_mode == "Batch Prediction":
         st.dataframe(df_preview.head())
         
         if st.button("Process Batch Predictions"):
-            with st.spinner("Processing predictions through backend..."):
+            with st.spinner("Processing batch records through neural network backend..."):
                 uploaded_file.seek(0)
                 files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "text/csv")}
                 
@@ -94,14 +117,47 @@ elif app_mode == "Batch Prediction":
                         result_df = pd.DataFrame(res_data["data"])
                         
                         st.success(f"Successfully processed {res_data['total_records']} records!")
-                        st.write("### Results:")
+                        
+                        # Professional Visualizations
+                        st.markdown("---")
+                        st.subheader("📊 Batch Analytics Dashboard")
+                        
+                        graph_col1, graph_col2 = st.columns(2)
+                        
+                        with graph_col1:
+                            # Pie Chart for Risk Distribution
+                            risk_counts = result_df['Risk_Flag'].value_counts().reset_index()
+                            risk_counts.columns = ['Risk_Flag', 'Count']
+                            fig_pie = px.pie(
+                                risk_counts, 
+                                names='Risk_Flag', 
+                                values='Count', 
+                                title="Overall Risk Distribution Ratio",
+                                hole=0.4,
+                                color='Risk_Flag',
+                                color_discrete_map={'High Risk': '#ff4b4b', 'Low Risk': '#00CC96'}
+                            )
+                            st.plotly_chart(fig_pie, use_container_width=True)
+                            
+                        with graph_col2:
+                            # Histogram for Probability Spread
+                            fig_hist = px.histogram(
+                                result_df, 
+                                x='Risk_Probability (%)', 
+                                nbins=20, 
+                                title="Risk Probability Distribution Spread",
+                                color_discrete_sequence=['#636EFA']
+                            )
+                            st.plotly_chart(fig_hist, use_container_width=True)
+
+                        st.write("### Detailed Result Records:")
                         st.dataframe(result_df)
                         
                         csv_data = result_df.to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            label="Download Results as CSV",
+                            label="Download Full Results as CSV",
                             data=csv_data,
-                            file_name="loan_risk_predictions.csv",
+                            file_name="loan_risk_batch_predictions.csv",
                             mime="text/csv"
                         )
                     else:
