@@ -14,18 +14,31 @@ app = FastAPI(
     version="1.0"
 )
 
-# Load Model and Preprocessing Artifacts safely ( adjusted for railway root directory setup )
+# Safe Model and Preprocessing Artifacts Loading for Railway Deployment
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_DIR = os.path.join(BASE_DIR, '..', 'model_artifacts')
-if not os.path.exists(MODEL_DIR):
-    MODEL_DIR = os.path.join(BASE_DIR, 'model_artifacts')
+
+# Check multiple possible paths for model_artifacts (Root or Backend folder)
+POSSIBLE_PATHS = [
+    os.path.join(BASE_DIR, '..', 'model_artifacts'),
+    os.path.join(BASE_DIR, 'model_artifacts')
+]
+
+MODEL_DIR = None
+for path in POSSIBLE_PATHS:
+    if os.path.exists(path) and os.path.exists(os.path.join(path, 'loan_risk_ann_model.keras')):
+        MODEL_DIR = path
+        break
 
 try:
+    if MODEL_DIR is None:
+        raise FileNotFoundError("model_artifacts directory or model files not found in standard paths.")
+        
     model = tf.keras.models.load_model(os.path.join(MODEL_DIR, 'loan_risk_ann_model.keras'))
     scaler = joblib.load(os.path.join(MODEL_DIR, 'scaler.pkl'))
     label_encoders = joblib.load(os.path.join(MODEL_DIR, 'label_encoders.pkl'))
 except Exception as e:
     model, scaler, label_encoders = None, None, None
+    print(f"CRITICAL ERROR LOADING ARTIFACTS: {str(e)}")
 
 # Expected Dataset Features in Exact Training Order
 EXPECTED_FEATURES = [
@@ -40,20 +53,26 @@ class ApplicantData(BaseModel):
     Experience: float
     CURRENT_JOB_YRS: float
     CURRENT_HOUSE_YRS: float
-    Married_Single: str  # Pydantic doesn't like slashes in variable names directly
+    Married_Single: str  
     House_Ownership: str
     Car_Ownership: str
     Profession: str
 
 @app.get("/")
 def home():
-    return {"status": "online", "message": "Loan Risk Prediction Backend is running successfully!"}
+    return {
+        "status": "online", 
+        "message": "Loan Risk Prediction Backend is running successfully!",
+        "artifacts_loaded": model is not None and scaler is not None and label_encoders is not None
+    }
 
 def process_data_and_predict(df: pd.DataFrame):
     if model is None or scaler is None or label_encoders is None:
-        raise HTTPException(status_code=500, detail="Model artifacts are not loaded properly.")
+        raise HTTPException(
+            status_code=500, 
+            detail="Model artifacts are not loaded properly. Please ensure model_artifacts folder is pushed to GitHub."
+        )
     
-    # Handle key naming convention if frontend passes Married/Single with slash or underscore
     if 'Married_Single' in df.columns and 'Married/Single' not in df.columns:
         df = df.rename(columns={'Married_Single': 'Married/Single'})
 
@@ -61,17 +80,16 @@ def process_data_and_predict(df: pd.DataFrame):
         if col not in df.columns:
             raise HTTPException(status_code=400, detail=f"Missing required column: {col}")
             
-    # Apply Label Encoders
+    # Apply Label Encoders safely
     for col, encoder in label_encoders.items():
         if col in df.columns:
             df[col] = df[col].astype(str)
             df[col] = df[col].apply(lambda x: x if x in encoder.classes_ else encoder.classes_[0])
             df[col] = encoder.transform(df[col])
             
-    # CRITICAL FIX: Ensure columns match the exact training feature sequence expected by the scaler
     df = df[EXPECTED_FEATURES]
             
-    # Scale Numerical Features using exact ordered DataFrame
+    # Scale Numerical Features
     scaled_data = scaler.transform(df)
     
     # Predict using ANN
@@ -81,7 +99,6 @@ def process_data_and_predict(df: pd.DataFrame):
 @app.post("/predict/single")
 def predict_single(applicant: ApplicantData):
     try:
-        # Map pydantic model fields properly
         data_dict = applicant.model_dump()
         data_dict['Married/Single'] = data_dict.pop('Married_Single')
         
