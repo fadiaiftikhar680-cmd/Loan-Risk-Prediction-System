@@ -14,24 +14,13 @@ app = FastAPI(
     version="1.0"
 )
 
-# Safe Model and Preprocessing Artifacts Loading for Railway Deployment
+# Load Model and Preprocessing Artifacts from backend/model_artifacts directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Check multiple possible paths for model_artifacts (Root or Backend folder)
-POSSIBLE_PATHS = [
-    os.path.join(BASE_DIR, '..', 'model_artifacts'),
-    os.path.join(BASE_DIR, 'model_artifacts')
-]
-
-MODEL_DIR = None
-for path in POSSIBLE_PATHS:
-    if os.path.exists(path) and os.path.exists(os.path.join(path, 'loan_risk_ann_model.keras')):
-        MODEL_DIR = path
-        break
+MODEL_DIR = os.path.join(BASE_DIR, 'model_artifacts')
 
 try:
-    if MODEL_DIR is None:
-        raise FileNotFoundError("model_artifacts directory or model files not found in standard paths.")
+    if not os.path.exists(MODEL_DIR):
+        raise FileNotFoundError(f"model_artifacts directory not found at {MODEL_DIR}")
         
     model = tf.keras.models.load_model(os.path.join(MODEL_DIR, 'loan_risk_ann_model.keras'))
     scaler = joblib.load(os.path.join(MODEL_DIR, 'scaler.pkl'))
@@ -70,7 +59,7 @@ def process_data_and_predict(df: pd.DataFrame):
     if model is None or scaler is None or label_encoders is None:
         raise HTTPException(
             status_code=500, 
-            detail="Model artifacts are not loaded properly. Please ensure model_artifacts folder is pushed to GitHub."
+            detail="Model artifacts are not loaded properly inside backend folder."
         )
     
     if 'Married_Single' in df.columns and 'Married/Single' not in df.columns:
