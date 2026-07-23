@@ -1,3 +1,11 @@
 streamlit
 requests
 pandas
+numpy
+tensorflow
+keras
+scikit-learn
+joblib
+fastapi
+uvicorn
+python-multipart
